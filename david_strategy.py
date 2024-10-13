@@ -32,17 +32,17 @@ class Strategy:
         for i in range(4):
             data["strike"] += float(row["symbol"][17+i]) / 10**(i+1)
 
-        return data;
+        return data
 
     def generate_orders(self) -> pd.DataFrame:
 
         orders = []
-        prev_time = "";
+        prev_time = ""
         # simple strategy:
         print(self.parse_order(self.options.iloc[0]))
         for i in range(0, 100):
-            row = self.options.iloc[i];
-            order = {};
+            row = self.options.iloc[i]
+            order = {}
 
             if (i < 50):
                 order = {
@@ -61,10 +61,10 @@ class Strategy:
                 }
 
             if (order["datetime"] == prev_time):
-                continue;
+                continue
             else:
                 orders.append(order)
                 prev_time = order["datetime"]
 
-        return pd.DataFrame(orders);
+        return pd.DataFrame(orders)
 

@@ -14,6 +14,12 @@ class Strategy:
     self.options : pd.DataFrame = pd.read_csv("data/cleaned_options_data.csv")
     self.options["day"] = self.options["ts_recv"].apply(lambda x: x.split("T")[0])
 
+    self.options["bid_px_00"] = self.options["bid_px_00"].astype(float)
+    self.options["ask_px_00"] = self.options["ask_px_00"].astype(float)
+    self.options["bid_sz_00"] = self.options["bid_sz_00"].astype(int)
+    self.options["ask_sz_00"] = self.options["ask_sz_00"].astype(int)
+    
+
     # appends a fair_value column to the pandas dataframe
     self.options = self.calculate_fair_value( self.options )
     self.moving_averages = defaultdict(deque)
@@ -35,15 +41,15 @@ class Strategy:
   def calculate_fair_value( self, order_book : pd.DataFrame ) -> pd.DataFrame :
     # use a size-weighted mid between Best Bid and Best Offer at a given time
     # for each order in the order_book, store the fair value for future computations
-    order_book[ "fair_value" ] =  self.find_size_wegihted_mid( 
-      float(order_book["bid_px_00"]), int(order_book["bid_sz_00"]), 
-      float(order_book["ask_px_00"], int(order_book["ask_sz_00"]) ))
+    self.options["fair_value"] = ((  order_book["bid_px_00"]*order_book["bid_sz_00"] 
+                                  + order_book["ask_sz_00"]*order_book["ask_px_00"] ) 
+                                  / (order_book["ask_sz_00"] + order_book["bid_sz_00"]))
     return order_book
   
 
   # helper function
   # given a symbol, will parse and return a dictionary with more friendly formatting of data
-  def parse_symbol( symbol : str ) -> dict:
+  def parse_symbol(self, symbol : str ) -> dict:
     _ , data = symbol.split(" ")
     parsed_symbol = {}
 
@@ -68,32 +74,47 @@ class Strategy:
     # # implement me!
     # moving avg strategy --> NOT FULLY FUNCTIONAL
 
-    try:
-      my_orders = pd.read_csv("data/example_orders.csv")
+    # my_orders = pd.read_csv("data/example_orders.csv")
+    
+    my_orders = pd.DataFrame(columns=['datetime', 'option_symbol', 'action', 'size'])
+    # print("generating orders...")
+    order_count = 0
+    # print("about to generate iterrows")
+    for row in self.options.itertuples():
+      # employ a moving averages strategy: if fair_value above the moving average sell
+      # if fair_value below the moving average, buy
+      self.moving_averages[ row.symbol ].append( row.fair_value )
+      curr_moving_average = sum(self.moving_averages[ row.symbol ]) / len(self.moving_averages[ row.symbol ])
+      if len(self.moving_averages[row.symbol]) > 5:
+        self.moving_averages[row.symbol].popleft()
+
+      if curr_moving_average > row.fair_value+1:
+        buy_order = { "datetime": row.ts_recv, 
+                     "option_symbol": row.symbol, 
+                     "action": "B", 
+                     "order_size": 1
+                     }
+        buy_order = pd.DataFrame( [buy_order] )
+        my_orders = pd.concat( [ my_orders, buy_order], ignore_index=True )
+        order_count += 1
+        # self.positions += (int(row.bid_sz_00))
+      elif curr_moving_average < row.fair_value-1:
+        sell_order = { "datetime": row.ts_recv, 
+                     "option_symbol": row.symbol, 
+                     "action": "S", 
+                     "order_size": 1 
+                     }
+        sell_order = pd.DataFrame( [sell_order] )
+        my_orders = pd.concat( [my_orders, sell_order], ignore_index=True )
+        order_count += 1
+        # self.positions -= (int(row.ask_sz_00))
       
-      my_orders = pd.DataFrame(columns=['datetime', 'option_symbol', 'action', 'size'])
-      for row in self.options.itertuples:
-        # employ a moving averages strategy: if fair_value above the moving average sell
-        # if fair_value below the moving average, buy
-        self.moving_averages[ row.symbol ].append( row.fair_value )
-        curr_moving_average = sum(self.moving_averages[ row.symbol ]) / len(self.moving_averages[ row.symbol ])
-        if len(self.moving_averages[row.symbol]) > 10:
-          self.moving_averages[row.symbol].popleft()
-
-        if curr_moving_average > row.fair_value+5:
-          buy_order = [ row.ts_recv, row.symbol, "B", row.bid_sz_00 ]
-          my_orders = my_orders.concat( buy_order, ignore_index=True )
-          self.positions += (int(row.bid_sz_00))
-        elif curr_moving_average < row.fair_value-5:
-          sell_order = [ row.ts_recv, row.symbol, "S", row.ask_sz_00 ]
-          my_orders = my_orders.concat( sell_order, ignore_index=True )
-          self.positions -= (int(row.ask_sz_00))
+      print(order_count)
+      if order_count > 5000:
+        break
 
 
-    except:
-      with open("errors.txt", "a") as file:
-        file.write("we just had an error")
-      
+    print("done generating orders")
 
     return my_orders
 
