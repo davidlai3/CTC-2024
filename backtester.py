@@ -81,6 +81,7 @@ class Backtester:
 
     while current_date <= self.end_date:
       for _, row in self.orders.iterrows():
+        print(str(current_date), "capital:", self.capital, "portfolio value:", self.portfolio_value, "total pnl:", (self.capital + self.portfolio_value), "open orders:", len(self.open_orders))
         if str(current_date).split(" ")[0] == str(row["day"]):
           option_metadata: List = self.parse_option_symbol(row["option_symbol"])
           order_size: float = float(row["order_size"])
