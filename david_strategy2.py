@@ -1,5 +1,6 @@
 import pandas as pd
 import helper
+from collections import deque
 from datetime import datetime
 
 class Strategy:
@@ -23,6 +24,9 @@ class Strategy:
         # earliest possible hour
         self.prev_hour = "2024-01-02 09:30:00-05:00";
 
+        # moving average of s&p data
+        self.moving_avg = deque()
+
 
     def generate_orders(self) -> pd.DataFrame:
 
@@ -40,6 +44,11 @@ class Strategy:
             prev_hour_data = self.underlying[prev_hour]
             mid = (prev_hour_data["high"] + prev_hour_data["low"])/2
 
+            self.moving_avg.append(mid)
+            if (len(self.moving_avg) > 10):
+                self.moving_avg.popleft()
+
+            mid = sum(self.moving_avg)/len(self.moving_avg)
             
             order_data = helper.parse_order(row);
 
