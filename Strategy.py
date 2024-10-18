@@ -95,11 +95,8 @@ class helper:
             "date" : row.ts_recv,
             "expiry" : row.symbol[6:12],
             "order_type" : row.symbol[12],
-            "strike" : float(row.symbol[13:18])
+            "strike" : float(row.symbol[13:20])/10000
         }
-
-        for i in range(3):
-            data["strike"] += float(row.symbol[18+i]) / 10**(i+1)
 
         return data
 
