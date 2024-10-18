@@ -38,7 +38,7 @@ class Strategy:
         for row in self.options.itertuples():
 
             prev_hour = helper.update_hour(row.ts_recv)
-            if (prev_hour not in self.underlying or c >= 5000):
+            if (prev_hour not in self.underlying or c >= 20000):
                 orders = pd.DataFrame(orders)
                 orders.to_csv("orders.csv", index=False)
                 print("Orders generated 1")
@@ -86,12 +86,12 @@ class Strategy:
                         "order_size" : int(row.bid_sz_00)//4
                     }
                     orders.append(order)
-            """
 
             else:
                 time_to_expiry = helper.time_difference_in_years(order_data["date"][:10], order_data["expiry"])
                 expected = pricing.black_scholes_put(mid, order_data["strike"], time_to_expiry)
 
+                """
                 print(f"Current time: {row.ts_recv}, Expiration: {order_data['expiry']}, Years to expiry: {time_to_expiry}")
                 print(f"Stock price: {mid}, Strike price: {order_data['strike']}")
                 print(f"Expected: {expected}, Actual: {order_data['ask_price']}")
@@ -104,7 +104,8 @@ class Strategy:
                         "order_size" : int(row.ask_sz_00)//4
                     }
                     orders.append(order)
-                elif (expected < order_data["bid_price"] - 10):
+                """
+                if (expected < order_data["bid_price"] - 10):
                     order = {
                         "datetime" : row.ts_recv,
                         "option_symbol" : row.symbol,
@@ -112,7 +113,6 @@ class Strategy:
                         "order_size" : int(row.bid_sz_00)//4
                     }
                     orders.append(order)
-            """
             c += 1
 
 
