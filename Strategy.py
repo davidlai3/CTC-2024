@@ -221,3 +221,12 @@ class Strategy:
 
         return pd.DataFrame(orders)
 
+
+if __name__ == "__main__":
+    strategy = Strategy("2024-01-02", "2024-01-03", "data/cleaned_options_data.csv", "data/underlying_data_hour.csv")
+    """
+
+    orders = strategy.generate_orders()
+    orders.to_csv("orders.csv", index=False)
+    print(orders)
+    """
