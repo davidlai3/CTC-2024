@@ -34,8 +34,6 @@ class Strategy:
     def generate_orders(self) -> pd.DataFrame:
 
         orders = []
-        prev_time = ""
-        c = 0
         for row in self.options.itertuples():
 
             prev_hour = helper.update_hour(row.ts_recv)
@@ -116,6 +114,3 @@ class Strategy:
 
         return pd.DataFrame(orders)
 
-
-if __name__ == "__main__":
-    s = Strategy()
