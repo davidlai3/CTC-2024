@@ -148,7 +148,7 @@ class Strategy:
         orders = []
         for row in self.options.itertuples():
 
-            if (self.ctr == 5000):
+            if (self.ctr == 15):
                 break
             
             if (self.minute_ptr > self.size - 50):
