@@ -205,6 +205,8 @@ class Strategy:
                         "order_size" : max(int(row.bid_sz_00)//4, 1)
                     }
                     orders.append(order)
+            self.ctr += 1
+
 
         return pd.DataFrame(orders)
 
