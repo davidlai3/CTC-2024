@@ -165,12 +165,13 @@ class Strategy:
             self.minute_ptr -= 1
 
             mid = float(self.underlying.iloc[self.minute_ptr]["price"])
+
+            if (mid == 0.0):
+                mid = float(self.underlying.iloc[self.minute_ptr-1]["price"])
             """
             
             mid = 5000
             
-            if (mid == 0.0):
-                mid = float(self.underlying.iloc[self.minute_ptr-1]["price"])
 
             symbol_data = helper.parse_option_symbol(row.symbol)
 
