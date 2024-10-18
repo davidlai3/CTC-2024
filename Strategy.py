@@ -52,19 +52,28 @@ class helper:
     # timestamp_1 is the order timestamp
     # timestamp_2 is the underlying timestamp
     # returns true if order timestamp is after underlying timestamp 
+
     @staticmethod
-    def compare_times(timestamp_1: str, timestamp_2: int, timestamp_2_day: str) -> bool:
+    def generate_datetime(ms: int, date: str) -> datetime:
+        hour = ms // 3600000
+        ms = ms % 3600000
+        minute = ms // 60000
+
+        base = datetime.strptime(date, "%Y%m%d")
+        compiled_datetime = base.replace(hour=hour, minute=minute)
+
+        return compiled_datetime
+
+
+    # timestamp_1 is the order timestamp
+    # timestamp_2 is the underlying timestamp
+    @staticmethod
+    def compare_times(timestamp_1: str, timestamp_2ms: int, timestamp_2day: str) -> bool:
         timestamp_1 = timestamp_1[:26] + 'Z'
-        timestamp = datetime.strptime(timestamp_1, "%Y-%m-%dT%H:%M:%S.%fZ")
+        dt1 = datetime.strptime(timestamp_1, "%Y-%m-%dT%H:%M:%S.%fZ")
+        dt2 = helper.generate_datetime(timestamp_2ms, timestamp_2day)
 
-        # Get the hour part of the timestamp
-        hour = timestamp.hour
-        # Get the minute part of the timestamp
-        minutes = timestamp.minute
-
-        adjusted = (hour * 60 + minutes) * 60000
-
-        return adjusted > timestamp_2
+        return dt1 > dt2 
 
 
     @staticmethod
@@ -145,14 +154,12 @@ class Strategy:
             if (self.minute_ptr > self.size - 50):
                 break
 
-            """
             # if the minute ptr is ahead, wait until orders catch up
-            while not helper.compare_times(row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
+            while not (helper.compare_times(row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"]), self.underlying.iloc[self.minute_ptr]["date"])):
                 continue
-           """
 
             # bring minute ptr to most recent time before order
-            while (self.minute_ptr < self.size - 50) and helper.compare_times(row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"])):
+            while (self.minute_ptr < self.size - 50) and row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"]), self.underlying.iloc[self.minute_ptr]["date"]:
                 self.minute_ptr += 1
             self.minute_ptr -= 1
             
