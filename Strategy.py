@@ -172,7 +172,7 @@ class Strategy:
             if (mid == 0.0):
                 mid = float(self.underlying.iloc[self.minute_ptr-1]["price"])
 
-            symbol_data = helper.parse_option_symbol(row)
+            symbol_data = helper.parse_option_symbol(row.symbol)
 
             if (row.ask_px_00 < 25):
                 continue
