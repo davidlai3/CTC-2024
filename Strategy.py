@@ -49,30 +49,22 @@ class pricing:
 
 class helper:
 
+    # timestamp_1 is the order timestamp
+    # timestamp_2 is the underlying timestamp
     @staticmethod
-    def update_hour(timestamp_str: str) -> str:
-        timestamp_str = timestamp_str[:26] + 'Z'
-        timestamp = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+    def compare_times(timestamp_1: str, timestamp_2: int) -> bool:
+        timestamp_1 = timestamp_1[:26] + 'Z'
+        timestamp = datetime.strptime(timestamp_1, "%Y-%m-%dT%H:%M:%S.%fZ")
         
+        # Get the hour part of the timestamp
+        hour = timestamp.hour
         # Get the minute part of the timestamp
         minutes = timestamp.minute
-        
 
-        # Determine if it should be rounded down to :00 or :30
-        if minutes < 30:
-            # Round down to :00
-            rounded_timestamp = timestamp.replace(minute=30, second=0, microsecond=0)
-            rounded_timestamp -= timedelta(hours=1)
-            if (rounded_timestamp.hour >= 16):
-                rounded_timestamp = rounded_timestamp.replace(hour=15)
-        else:
-            # Round down to :30
-            rounded_timestamp = timestamp.replace(minute=30, second=0, microsecond=0)
-            if (rounded_timestamp.hour >= 16):
-                rounded_timestamp = rounded_timestamp.replace(hour=15)
-        
-        formatted_date = rounded_timestamp.strftime("%Y-%m-%d %H:%M:%S-05:00")
-        return formatted_date
+        adjusted = (hour * 60 + minutes) * 60000
+
+        return adjusted > timestamp_2
+
 
     @staticmethod
     def time_difference_in_years(date1: str, date2: str) -> float:
@@ -126,16 +118,8 @@ class Strategy:
         self.underlying = pd.read_csv(underlying)
         self.underlying.columns = self.underlying.columns.str.lower()
 
-        self.hour_data = {}
-        for row in self.underlying.itertuples():
-            self.hour_data[row.date] = {"open" : row.open, "high" : row.high, "low" : row.low, "close" : row.close, "volume" : row.volume}
-        self.underlying = self.hour_data
-
         # earliest possible hour
-        self.prev_hour = "2024-01-02 09:30:00-05:00";
-
-        # moving average of s&p data
-        self.moving_avg = deque()
+        self.minute_ptr = 0;
 
 
     def generate_orders(self) -> pd.DataFrame:
@@ -143,20 +127,14 @@ class Strategy:
         orders = []
         for row in self.options.itertuples():
 
-            prev_hour = helper.update_hour(row.ts_recv)
-            if (prev_hour not in self.underlying):
-                orders = pd.DataFrame(orders)
-                orders.to_csv("orders.csv", index=False)
-                return orders
-            prev_hour_data = self.underlying[prev_hour]
-            mid = (prev_hour_data["high"] + prev_hour_data["low"])/2
-
-            self.moving_avg.append(mid)
-            if (len(self.moving_avg) > 10):
-                self.moving_avg.popleft()
-
-            mid = sum(self.moving_avg)/len(self.moving_avg)
+            while not helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
+                self.minute_ptr += 1
+            self.minute_ptr -= 1
             
+            mid = float(self.underlying.iloc[self.minute_ptr]["price"])
+            if (mid == 0.0):
+                mid = float(self.underlying.iloc[self.minute_ptr-1]["price"])
+
             order_data = helper.parse_order(row);
 
             if (order_data["ask_price"] < 25):
@@ -167,28 +145,13 @@ class Strategy:
             if (order_data["order_type"] == 'C'):
                 time_to_expiry = helper.time_difference_in_years(order_data["date"][:10], order_data["expiry"])
                 expected = pricing.black_scholes_call(mid, order_data["strike"], time_to_expiry)
-                """
-                print(f"Current time: {row.ts_recv}, Expiration: {order_data['expiry']}, Years to expiry: {time_to_expiry}")
-                print(f"Stock price: {mid}, Strike price: {order_data['strike']}")
-                print(f"Expected: {expected}, Actual: {order_data['ask_price']}")
-                """
-                """
-                if (expected > order_data["ask_price"] + 10):
-                    order = {
-                        "datetime" : row.ts_recv,
-                        "option_symbol" : row.symbol,
-                        "action" : "B",
-                        "order_size" : int(row.ask_sz_00)//4
-                    }
-                    orders.append(order)
-                """
 
                 if (expected < order_data["bid_price"] - 10):
                     order = {
                         "datetime" : row.ts_recv,
                         "option_symbol" : row.symbol,
                         "action" : "S",
-                        "order_size" : int(row.bid_sz_00)//4
+                        "order_size" : max(int(row.bid_sz_00)//4, 1)
                     }
                     orders.append(order)
 
@@ -196,26 +159,12 @@ class Strategy:
                 time_to_expiry = helper.time_difference_in_years(order_data["date"][:10], order_data["expiry"])
                 expected = pricing.black_scholes_put(mid, order_data["strike"], time_to_expiry)
 
-                """
-                print(f"Current time: {row.ts_recv}, Expiration: {order_data['expiry']}, Years to expiry: {time_to_expiry}")
-                print(f"Stock price: {mid}, Strike price: {order_data['strike']}")
-                print(f"Expected: {expected}, Actual: {order_data['ask_price']}")
-
-                if (expected > order_data["ask_price"] + 10):
-                    order = {
-                        "datetime" : row.ts_recv,
-                        "option_symbol" : row.symbol,
-                        "action" : "B",
-                        "order_size" : int(row.ask_sz_00)//4
-                    }
-                    orders.append(order)
-                """
                 if (expected < order_data["bid_price"] - 10):
                     order = {
                         "datetime" : row.ts_recv,
                         "option_symbol" : row.symbol,
                         "action" : "S",
-                        "order_size" : int(row.bid_sz_00)//4
+                        "order_size" : max(int(row.bid_sz_00)//4, 1)
                     }
                     orders.append(order)
 
