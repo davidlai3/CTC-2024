@@ -154,6 +154,7 @@ class Strategy:
             if (self.minute_ptr > self.size - 50):
                 break
 
+            """
             # if the minute ptr is ahead, wait until orders catch up
             while not (helper.compare_times(row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"]), self.underlying.iloc[self.minute_ptr]["date"])):
                 continue
@@ -162,8 +163,12 @@ class Strategy:
             while (self.minute_ptr < self.size - 50) and row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"]), self.underlying.iloc[self.minute_ptr]["date"]:
                 self.minute_ptr += 1
             self.minute_ptr -= 1
-            
+
             mid = float(self.underlying.iloc[self.minute_ptr]["price"])
+            """
+            
+            mid = 5000
+            
             if (mid == 0.0):
                 mid = float(self.underlying.iloc[self.minute_ptr-1]["price"])
 
