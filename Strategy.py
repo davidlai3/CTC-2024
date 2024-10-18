@@ -6,17 +6,19 @@ from datetime import datetime
 
 class Strategy:
   
-    def __init__(self) -> None:
+    def __init__(self, start_date, end_date, options_data, underlying) -> None:
         self.capital : float = 100_000_000
         self.portfolio_value : float = 0
 
-        self.start_date : datetime = datetime(2024, 1, 1)
-        self.end_date : datetime = datetime(2024, 3, 30)
-
-        self.options : pd.DataFrame = pd.read_csv("data/cleaned_options_data.csv")
+        self.start_date : datetime = start_date
+        self.end_date : datetime = end_date
+      
+        self.options : pd.DataFrame = pd.read_csv(options_data)
         self.options["day"] = self.options["ts_recv"].apply(lambda x: x.split("T")[0])
 
-        self.underlying = pd.read_csv("data/underlying_data_hour.csv")
+        self.underlying = pd.read_csv(underlying)
+        self.underlying.columns = self.underlying.columns.str.lower()
+
         self.hour_data = {}
         for row in self.underlying.itertuples():
             self.hour_data[row.date] = {"open" : row.open, "high" : row.high, "low" : row.low, "close" : row.close, "volume" : row.volume}
@@ -33,15 +35,13 @@ class Strategy:
 
         orders = []
         prev_time = ""
-        print("Generating orders...")
         c = 0
         for row in self.options.itertuples():
 
             prev_hour = helper.update_hour(row.ts_recv)
-            if (prev_hour not in self.underlying or c >= 20000):
+            if (prev_hour not in self.underlying):
                 orders = pd.DataFrame(orders)
                 orders.to_csv("orders.csv", index=False)
-                print("Orders generated 1")
                 return orders
             prev_hour_data = self.underlying[prev_hour]
             mid = (prev_hour_data["high"] + prev_hour_data["low"])/2
@@ -113,10 +113,7 @@ class Strategy:
                         "order_size" : int(row.bid_sz_00)//4
                     }
                     orders.append(order)
-            c += 1
 
-
-        print("Orders generated 2")
         return pd.DataFrame(orders)
 
 
