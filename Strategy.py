@@ -53,10 +53,10 @@ class helper:
     # timestamp_2 is the underlying timestamp
     # returns true if order timestamp is after underlying timestamp 
     @staticmethod
-    def compare_times(timestamp_1: str, timestamp_2: int) -> bool:
+    def compare_times(timestamp_1: str, timestamp_2: int, timestamp_2_day: str) -> bool:
         timestamp_1 = timestamp_1[:26] + 'Z'
         timestamp = datetime.strptime(timestamp_1, "%Y-%m-%dT%H:%M:%S.%fZ")
-        
+
         # Get the hour part of the timestamp
         hour = timestamp.hour
         # Get the minute part of the timestamp
@@ -68,15 +68,12 @@ class helper:
 
 
     @staticmethod
-    def time_difference_in_years(date1: str, date2: str) -> float:
+    def time_difference_in_years(date1: str, date2: datetime) -> float:
         # Parse the first date formatted as "yyyy-mm-dd"
         date1_parsed = datetime.strptime(date1, "%Y-%m-%d")
         
-        # Parse the second date formatted as "yymmdd"
-        date2_parsed = datetime.strptime(date2, "%y%m%d")
-        
         # Calculate the difference in days
-        difference_in_days = abs((date1_parsed - date2_parsed).days)
+        difference_in_days = abs((date1_parsed - date2).days)
         
         # Convert days to years
         difference_in_years = difference_in_days / 365.25  # Considering leap years
@@ -84,12 +81,26 @@ class helper:
         return difference_in_years
 
     @staticmethod
-    def parse_order(row) -> dict:
+    def parse_option_symbol(symbol) -> dict:
         """
+        EXAMPLE: SPX 20230120P2800000
+        """
+        numbers : str = symbol.split(" ")[1]
+        date : str = numbers[:8]
+        date_yymmdd : str = date[0:4] + "-" + date[4:6] + "-" + date[6:8]
+        action : str = numbers[8]
+        strike_price : float = int(numbers[9:])/1000
+        return {
+            "expiry": datetime.strptime(date_yymmdd, "%Y-%m-%d"),
+            "action": action,
+            "strike": strike_price
+        }
+
+    """
+    def parse_order(row) -> dict:
             "instrument" : row["instrument_id"],
             "bid_size" : row["bid_sz_00"],
             "ask_size" : row["ask_sz_00"],
-        """
         data = {
             "bid_price" : row.bid_px_00,
             "ask_price" : row.ask_px_00,
@@ -100,6 +111,7 @@ class helper:
         }
 
         return data
+    """
 
 class Strategy:
   
@@ -119,22 +131,28 @@ class Strategy:
 
         # earliest possible hour
         self.minute_ptr = 5
+        self.ctr = 0
 
 
     def generate_orders(self) -> pd.DataFrame:
 
         orders = []
         for row in self.options.itertuples():
+
+            if (self.ctr == 5000):
+                break
             
             if (self.minute_ptr > self.size - 50):
-                break;
+                break
 
+            """
             # if the minute ptr is ahead, wait until orders catch up
-            while not helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
-                continue;
+            while not helper.compare_times(row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
+                continue
+           """
 
             # bring minute ptr to most recent time before order
-            while (self.minute_ptr < self.size - 50) and helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
+            while (self.minute_ptr < self.size - 50) and helper.compare_times(row.ts_recv, int(self.underlying.iloc[self.minute_ptr]["ms_of_day"])):
                 self.minute_ptr += 1
             self.minute_ptr -= 1
             
@@ -142,18 +160,19 @@ class Strategy:
             if (mid == 0.0):
                 mid = float(self.underlying.iloc[self.minute_ptr-1]["price"])
 
-            order_data = helper.parse_order(row);
+            symbol_data = helper.parse_option_symbol(row)
 
-            if (order_data["ask_price"] < 25):
+            if (row.ask_px_00 < 25):
                 continue
 
             order = {}
 
-            if (order_data["order_type"] == 'C'):
-                time_to_expiry = helper.time_difference_in_years(order_data["date"][:10], order_data["expiry"])
-                expected = pricing.black_scholes_call(mid, order_data["strike"], time_to_expiry)
+            # If the order is an overvalued call then we can sell it
+            if (symbol_data["action"] == 'C'):
+                time_to_expiry = helper.time_difference_in_years(row.ts_recv[:10], symbol_data["expiry"])
+                expected = pricing.black_scholes_call(mid, symbol_data["strike"], time_to_expiry)
 
-                if (expected < order_data["bid_price"] - 10):
+                if (expected < row.bid_px_00 - 10):
                     order = {
                         "datetime" : row.ts_recv,
                         "option_symbol" : row.symbol,
@@ -161,12 +180,12 @@ class Strategy:
                         "order_size" : max(int(row.bid_sz_00)//4, 1)
                     }
                     orders.append(order)
-
+            # If the order is an overvalued put then we can sell it
             else:
-                time_to_expiry = helper.time_difference_in_years(order_data["date"][:10], order_data["expiry"])
-                expected = pricing.black_scholes_put(mid, order_data["strike"], time_to_expiry)
+                time_to_expiry = helper.time_difference_in_years(row.ts_recv[:10], symbol_data["expiry"])
+                expected = pricing.black_scholes_call(mid, symbol_data["strike"], time_to_expiry)
 
-                if (expected < order_data["bid_price"] - 10):
+                if (expected < row.bid_px_00 - 10):
                     order = {
                         "datetime" : row.ts_recv,
                         "option_symbol" : row.symbol,
