@@ -51,6 +51,7 @@ class helper:
 
     # timestamp_1 is the order timestamp
     # timestamp_2 is the underlying timestamp
+    # returns true if order timestamp is after underlying timestamp 
     @staticmethod
     def compare_times(timestamp_1: str, timestamp_2: int) -> bool:
         timestamp_1 = timestamp_1[:26] + 'Z'
@@ -116,7 +117,7 @@ class Strategy:
         self.underlying.columns = self.underlying.columns.str.lower()
 
         # earliest possible hour
-        self.minute_ptr = 0;
+        self.minute_ptr = 5
 
 
     def generate_orders(self) -> pd.DataFrame:
@@ -124,7 +125,12 @@ class Strategy:
         orders = []
         for row in self.options.itertuples():
 
+            # if the minute ptr is ahead, wait until orders catch up
             while not helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
+                continue;
+
+            # bring minute ptr to most recent time before order
+            while helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
                 self.minute_ptr += 1
             self.minute_ptr -= 1
             
