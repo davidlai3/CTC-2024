@@ -115,6 +115,7 @@ class Strategy:
 
         self.underlying = pd.read_csv(underlying)
         self.underlying.columns = self.underlying.columns.str.lower()
+        self.size = len(self.underlying)
 
         # earliest possible hour
         self.minute_ptr = 5
@@ -124,13 +125,16 @@ class Strategy:
 
         orders = []
         for row in self.options.itertuples():
+            
+            if (self.minute_ptr > self.size - 50):
+                break;
 
             # if the minute ptr is ahead, wait until orders catch up
             while not helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
                 continue;
 
             # bring minute ptr to most recent time before order
-            while helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
+            while (self.minute_ptr < self.size - 50) and helper.compare_times(row.ts_recv, self.underlying.iloc[self.minute_ptr]["ms_of_day"]):
                 self.minute_ptr += 1
             self.minute_ptr -= 1
             
